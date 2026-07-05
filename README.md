@@ -141,11 +141,19 @@ To stand up the **phone** receptionist, you don't need this backend at all — y
 
 1. Create an agent in a voice platform such as **[Vapi](https://vapi.ai)** or **[Synthflow](https://synthflow.ai)**.
 2. Paste the contents of **AVA_BRAIN.md** as the agent's **system prompt**, and use the greeting from the *Voice Call Flow* section as the **first message**.
-3. Fill in the placeholders in the platform config (never in this repo):
-   - `[HOURS]` — your business hours + timezone.
-   - `[CELL NUMBER]` — Robert's cell, as the **warm-transfer** target during business hours.
+3. Fill in the placeholders **in the platform's private config, never in this repo**:
+   - `[HOURS]` — business hours. Currently **Monday–Friday, 9:00 AM–5:00 PM ET**.
+   - `[TRANSFER_CELL]` — Robert's cell, as the **screened-transfer** target during business hours. ⚠️ **Enter this only in the voice platform's settings. It must never be committed to this public repo.**
    - `[BOOKING LINK]` — your Cal.com/Calendly URL.
-4. Configure the platform so that **during business hours** it can warm-transfer to `[CELL NUMBER]`, and **after hours** it takes a detailed message (the template is in AVA_BRAIN.md → Voice Call Flow) and routes it to Robert (email/SMS).
+
+### Screened / whisper transfer (important)
+
+Robert wants to **know it's an Obsidian Labs call before he answers.** So the business-hours transfer is a **screened (whisper) transfer**, not a blind one: the platform calls Robert's cell, plays him a private whisper ("Obsidian Labs call from [caller] about [reason] — press 1 to accept, or hang up to send them to a message"), and only bridges the caller through **if Robert accepts**. If he declines / doesn't answer, Ava takes a detailed message instead (template in AVA_BRAIN.md → Voice Call Flow) and routes it to Robert via email/SMS. Configure it like this:
+
+- **Vapi** — use a `transferCall` tool with `destination.type: "number"` set to `[TRANSFER_CELL]`, and a transfer plan that plays a whisper before connecting: set `transferPlan.mode` to `"warm-transfer-experimental"` (or the current warm/whisper mode), with a `summaryPlan` / whisper message announcing the caller. Enable "require acceptance" (DTMF press-1) so the call only bridges when Robert confirms; otherwise fall back to the message flow. See Vapi's *Call Transfers → Warm transfer with a summary* docs.
+- **Synthflow** — add a **Call Transfer** action set to **Warm Transfer** (not cold/blind), point it at `[TRANSFER_CELL]`, and enable the **agent whisper / transfer message** so the agent announces the caller to Robert and waits for him to accept before connecting. If the transfer isn't accepted, route back to the message-taking flow. See Synthflow's *Warm Transfer* action docs.
+
+Set business-hours logic (9–5 ET, Mon–Fri) as a condition/variable on the transfer action so it only attempts the screened transfer during hours and takes a message otherwise.
 
 ---
 
