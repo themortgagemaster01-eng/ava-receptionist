@@ -1,0 +1,15 @@
+# Never commit secrets or local env files
+.dev.vars
+.env
+.env.*
+*.local
+
+# Dependencies / build output
+node_modules/
+dist/
+.wrangler/
+.vercel/
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
