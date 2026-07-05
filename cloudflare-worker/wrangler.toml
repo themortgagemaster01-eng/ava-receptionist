@@ -1,0 +1,21 @@
+# Cloudflare Worker config for Ava's chat backend.
+#
+# Deploy:  npx wrangler deploy
+# Secrets (NOT stored in this file — set them via CLI):
+#   npx wrangler secret put ANTHROPIC_API_KEY
+#   npx wrangler secret put LEAD_WEBHOOK_URL      # optional
+#
+# Only NON-secret vars belong under [vars]. Never put the API key here.
+
+name = "ava-receptionist"
+main = "worker.js"
+compatibility_date = "2025-06-01"
+
+[vars]
+# Comma-separated list of origins allowed to call this Worker.
+# Update to your real production domain(s) before go-live.
+ALLOWED_ORIGINS = "https://obsidianlabs.io,https://www.obsidianlabs.io"
+
+# Secrets are set with `wrangler secret put ...`, never committed:
+#   ANTHROPIC_API_KEY   (required)
+#   LEAD_WEBHOOK_URL    (optional — Formspree / Apps Script / email relay)
