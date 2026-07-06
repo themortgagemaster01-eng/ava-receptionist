@@ -1,21 +1,28 @@
-# Cloudflare Worker config for Ava's chat backend.
+# Cloudflare Worker config for Ava's chat backend — Workers AI edition.
 #
-# Deploy:  npx wrangler deploy
-# Secrets (NOT stored in this file — set them via CLI):
-#   npx wrangler secret put ANTHROPIC_API_KEY
-#   npx wrangler secret put LEAD_WEBHOOK_URL      # optional
+# Deploy:  npx wrangler deploy      (that's it — NO API keys, NO secrets needed
+#                                    for chat; Workers AI is built into Cloudflare)
 #
-# Only NON-secret vars belong under [vars]. Never put the API key here.
+# Optional secret (only if you want lead delivery to a webhook):
+#   npx wrangler secret put LEAD_WEBHOOK_URL
 
 name = "ava-receptionist"
 main = "worker.js"
-compatibility_date = "2025-06-01"
+compatibility_date = "2026-07-01"
+
+# Workers AI binding — this replaces the Anthropic API key entirely.
+# Included in the FREE Workers plan: 10,000 neurons/day (resets 00:00 UTC).
+[ai]
+binding = "AI"
+
+# Lets worker.js import ../AVA_BRAIN.md as a text module, so the master brain
+# file IS the system prompt — no duplicated prompt string to keep in sync.
+[[rules]]
+type = "Text"
+globs = ["**/*.md"]
+fallthrough = true
 
 [vars]
 # Comma-separated list of origins allowed to call this Worker.
-# Update to your real production domain(s) before go-live.
-ALLOWED_ORIGINS = "https://obsidianlabs.io,https://www.obsidianlabs.io"
-
-# Secrets are set with `wrangler secret put ...`, never committed:
-#   ANTHROPIC_API_KEY   (required)
-#   LEAD_WEBHOOK_URL    (optional — Formspree / Apps Script / email relay)
+# GitHub Pages origin included so the current site works before the .io domain.
+ALLOWED_ORIGINS = "https://obsidianlabs.io,https://www.obsidianlabs.io,https://themortgagemaster01-eng.github.io"

@@ -1,24 +1,20 @@
 /**
  * Ava widget → backend integration snippet
  * ========================================
- * ADD THIS TO THE OBSIDIAN LABS SITE LATER — after the Worker/Vercel backend is
- * deployed. It shows how to point the existing on-page "Ava" chat widget at the
- * streaming /chat endpoint and (optionally) post a captured lead to /lead.
+ * Points the on-page "Ava" chat at the Cloudflare Worker's streaming /chat
+ * endpoint and (optionally) posts a captured lead to /lead.
  *
- * Nothing here contains secrets. The API key stays on the server.
+ * Nothing here contains secrets — there are none anymore. The backend runs on
+ * Cloudflare Workers AI (no API keys at all).
  *
- * SETUP: set AVA_ENDPOINT to your deployed backend base URL, e.g.
- *   Cloudflare: "https://ava-receptionist.<your-subdomain>.workers.dev"
- *   Vercel:     "https://<your-project>.vercel.app/api/chat"  (note the path difference below)
+ * SETUP: set AVA_ENDPOINT to your deployed Worker base URL, e.g.
+ *   "https://ava-receptionist.<your-subdomain>.workers.dev"
  */
 
-const AVA_ENDPOINT = "https://ava-receptionist.YOUR-SUBDOMAIN.workers.dev"; // <-- change me
+const AVA_ENDPOINT = "https://ava-receptionist.themortgagemaster01.workers.dev"; // <-- change me
 
-// Cloudflare exposes /chat and /lead. On Vercel it's /api/chat and /api/chat?route=lead.
-// Flip this to true if you deployed the Vercel function instead of the Worker.
-const USE_VERCEL = false;
-const CHAT_URL = USE_VERCEL ? `${AVA_ENDPOINT}` : `${AVA_ENDPOINT}/chat`;
-const LEAD_URL = USE_VERCEL ? `${AVA_ENDPOINT}?route=lead` : `${AVA_ENDPOINT}/lead`;
+const CHAT_URL = `${AVA_ENDPOINT}/chat`;
+const LEAD_URL = `${AVA_ENDPOINT}/lead`;
 
 // Conversation history kept in memory for the session (role: "user" | "assistant").
 const avaHistory = [];
@@ -39,6 +35,7 @@ async function sendToAva(userText, onChunk) {
   });
 
   if (!res.ok || !res.body) {
+    avaHistory.pop(); // keep history consistent on failure
     throw new Error(`Ava request failed: ${res.status}`);
   }
 
@@ -73,38 +70,5 @@ async function captureLead({ name, business, contact, need, website, notes }) {
     return false;
   }
 }
-
-/* ---------------------------------------------------------------------------
- * EXAMPLE: wiring to a simple existing widget. Adapt the element IDs/classes to
- * match the real markup already on obsidianlabs.io. This block is illustrative.
- * ------------------------------------------------------------------------- */
-//
-// const form   = document.querySelector("#ava-form");
-// const input  = document.querySelector("#ava-input");
-// const thread = document.querySelector("#ava-thread");
-//
-// form.addEventListener("submit", async (e) => {
-//   e.preventDefault();
-//   const text = input.value.trim();
-//   if (!text) return;
-//   input.value = "";
-//   appendBubble("user", text);
-//
-//   const bubble = appendBubble("assistant", "");   // empty bubble to fill as it streams
-//   try {
-//     await sendToAva(text, (chunk) => { bubble.textContent += chunk; });
-//   } catch {
-//     bubble.textContent = "Sorry — I'm having trouble right now. Please try again.";
-//   }
-// });
-//
-// function appendBubble(role, text) {
-//   const el = document.createElement("div");
-//   el.className = `ava-bubble ava-${role}`;
-//   el.textContent = text;
-//   thread.appendChild(el);
-//   thread.scrollTop = thread.scrollHeight;
-//   return el;
-// }
 
 export { sendToAva, captureLead };

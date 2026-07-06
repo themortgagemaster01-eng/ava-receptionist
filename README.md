@@ -1,11 +1,8 @@
 # Ava — AI Receptionist for Obsidian Labs
 
-The foundation for **Ava**, the AI receptionist for [Obsidian Labs](https://obsidianlabs.io) — a Hudson Valley web-design studio (HQ Mahopac, NY). Ava answers questions, captures leads, and books calls **24/7** across two channels that share one brain:
+The chat backend for **Ava**, the AI receptionist for [Obsidian Labs](https://obsidianlabs.io) — a Hudson Valley web-design studio (HQ Mahopac, NY). Ava answers questions, captures leads, and offers to book calls **24/7**.
 
-- **Website chat** — a small serverless backend that streams replies from Claude.
-- **Phone / voice** — the same persona pasted into a voice platform (Vapi, Synthflow, etc.).
-
-> ⚠️ **Status: foundation only.** Nothing here is wired to the live obsidianlabs site yet, and **no API keys or credentials are stored in this repo.** Deploy it yourself and add your own secret (steps below).
+> ✅ **Zero API keys.** This backend runs entirely on **Cloudflare Workers AI** (the `env.AI` binding), included in Cloudflare's **free** Workers plan. No Anthropic key, no xAI key, no secrets to manage for chat.
 
 ---
 
@@ -14,130 +11,107 @@ The foundation for **Ava**, the AI receptionist for [Obsidian Labs](https://obsi
 ```
 AVA_BRAIN.md                     ← THE MASTER: Ava's persona, knowledge, FAQ,
                                    lead-capture rules, voice call flow, booking.
-                                   Used by BOTH the chat backend and the phone agent.
+                                   Imported directly by the Worker as the system
+                                   prompt at deploy time — edit it, redeploy, done.
 
-cloudflare-worker/               ← Primary chat backend (recommended)
-  worker.js                      ← Streams Claude replies; /chat + /lead endpoints
-  wrangler.toml                  ← Config (non-secret vars only)
-
-vercel/
-  api/chat.js                    ← Equivalent backend as a Vercel Edge Function
-                                   (use ONE backend — Cloudflare OR Vercel, not both)
+cloudflare-worker/
+  worker.js                      ← Streams replies from Workers AI; /chat + /lead
+  wrangler.toml                  ← Config incl. the [ai] binding (no secrets)
 
 widget/
   ava-widget-integration.js      ← Snippet to point the site's Ava widget at the
-                                   backend — ADD TO THE SITE LATER, once deployed.
+                                   backend — add to the site once deployed.
 
 .gitignore
 ```
 
-The `SYSTEM_PROMPT` inside `worker.js` and `vercel/api/chat.js` is an operational copy of **AVA_BRAIN.md**. AVA_BRAIN.md is the master — if you change the offer, pricing, or persona there, update the prompt string in whichever backend you deploy.
+---
+
+## The model
+
+| Setting | Value |
+|---|---|
+| Model | `@cf/meta/llama-3.3-70b-instruct-fp8-fast` |
+| Why | The strongest general chat model on Workers AI that fits sensibly in the free daily allocation. 70B parameters, fast fp8 serving, excellent instruction-following for a receptionist persona. |
+| Free allocation | 10,000 neurons/day on the free plan (resets 00:00 UTC) ≈ **90–100 Ava replies/day** at typical conversation sizes |
+| If exhausted | Requests fail for the rest of the day → Ava returns a polite fallback message pointing to hello@obsidianlabs.io. Upgrading to Workers Paid ($5/mo) removes the ceiling ($0.011/1k neurons beyond the free 10k). |
+| Swap it | One line in `worker.js` (`MODEL`). Alternatives: `@cf/openai/gpt-oss-120b` (strong reasoning, similar cost) or `@cf/meta/llama-3.1-8b-instruct-fp8-fast` (~5x more replies/day, noticeably less smart). |
+
+## Built-in guardrails
+
+- **Reply cap** — `max_tokens: 512`, plus prompt instructions to keep replies to 2–4 sentences.
+- **History trimming** — last 12 turns, 2,000 chars per message, 14,000 chars total; oldest turns dropped first.
+- **Graceful fallback** — any model error (including a used-up daily allocation) returns a friendly plain-text message instead of a broken widget.
+- **Business hours aware** — the Worker computes the current time in `America/New_York` (DST-safe) on every request and tells Ava whether the studio is OPEN (Mon–Fri 9–5 ET). After hours, Ava offers to take a message for a next-business-day follow-up instead of promising an immediate callback.
+- **CORS fails closed** — only origins in `ALLOWED_ORIGINS` may call the backend.
 
 ---
 
-## How it works
+## Deploy (free — ~5 minutes, no API keys)
 
-```
-Visitor types in the Ava widget
-        │  POST /chat  { messages: [...] }
-        ▼
-Cloudflare Worker (or Vercel Edge Function)
-   • CORS-locked to obsidianlabs.io
-   • adds Ava's system prompt (AVA_BRAIN)
-   • calls the Anthropic Claude API with your SECRET key
-   • streams the reply back as plain text
-        │
-        ▼
-Widget appends the streamed text live
+**Prerequisites:** Node.js installed. That's it.
 
-Captured a lead?  POST /lead → forwarded to your webhook (Formspree / Apps Script / email)
-```
+1. **Create a free Cloudflare account** (if you don't have one): <https://dash.cloudflare.com/sign-up> — free plan is fine; no card needed.
 
-The Anthropic API key **never** touches the browser and is **never** in this repo — it lives as an environment secret on the server.
-
----
-
-## Deploy the chat backend (Cloudflare Worker — recommended)
-
-**Prerequisites:** a free [Cloudflare](https://dash.cloudflare.com/sign-up) account, Node.js installed, and an [Anthropic API key](https://console.anthropic.com/).
-
-1. **Get the code**
+2. **Get the code**
 
    ```bash
    git clone https://github.com/themortgagemaster01-eng/ava-receptionist.git
    cd ava-receptionist/cloudflare-worker
    ```
 
-2. **Set your production domain(s)** — edit `wrangler.toml`, `ALLOWED_ORIGINS`:
-
-   ```toml
-   ALLOWED_ORIGINS = "https://obsidianlabs.io,https://www.obsidianlabs.io"
-   ```
-
-3. **Add your Anthropic API key as a SECRET** (this is the important step — it is NOT stored in the repo):
+3. **Log in and deploy**
 
    ```bash
-   npx wrangler secret put ANTHROPIC_API_KEY
-   # paste your key when prompted
-   ```
-
-   Optional — to deliver captured leads, add a webhook (Formspree form URL, a Google Apps Script web-app URL, or any email relay):
-
-   ```bash
-   npx wrangler secret put LEAD_WEBHOOK_URL
-   ```
-
-4. **Deploy**
-
-   ```bash
+   npx wrangler login    # opens a browser — approve once
    npx wrangler deploy
    ```
 
-   Wrangler prints your Worker URL, e.g. `https://ava-receptionist.<your-subdomain>.workers.dev`. That's your backend base URL.
+   Wrangler prints your Worker URL, e.g. `https://ava-receptionist.<your-subdomain>.workers.dev`. **That's the whole deploy — no secrets to set.**
 
-   *(Prefer clicking? You can also paste `worker.js` into the Cloudflare dashboard → Workers & Pages → Create → Edit code, then set `ANTHROPIC_API_KEY` under Settings → Variables → Secrets, and `ALLOWED_ORIGINS` as a plain Variable.)*
-
-5. **Test it**
+4. **Test it**
 
    ```bash
    curl -X POST https://ava-receptionist.<your-subdomain>.workers.dev/chat \
      -H "content-type: application/json" \
-     -H "Origin: https://obsidianlabs.io" \
+     -H "Origin: https://themortgagemaster01-eng.github.io" \
      -d '{"messages":[{"role":"user","content":"How much does a site cost?"}]}'
    ```
 
    You should see Ava's answer stream back.
 
-### Vercel alternative
+5. **Optional — lead delivery webhook** (Formspree / Apps Script / email relay):
 
-If you'd rather use Vercel: deploy a project containing `vercel/api/chat.js`, then in **Project Settings → Environment Variables** add `ANTHROPIC_API_KEY`, `ALLOWED_ORIGINS`, and (optional) `LEAD_WEBHOOK_URL`. Your endpoint becomes `https://<project>.vercel.app/api/chat` (leads go to `/api/chat?route=lead`). Use **one** backend, not both.
+   ```bash
+   npx wrangler secret put LEAD_WEBHOOK_URL
+   ```
+
+**Config notes**
+
+- `ALLOWED_ORIGINS` in `wrangler.toml` already includes `https://themortgagemaster01-eng.github.io` (the GitHub Pages origin) and the future `obsidianlabs.io` domains. Adjust as needed and redeploy.
+- Changed `AVA_BRAIN.md`? Just `npx wrangler deploy` again — the Worker imports it at build time.
 
 ---
 
-## Wire the widget to the site (do this LATER)
+## Wire the widget to the site
 
 Once the backend is deployed and tested:
 
-1. Open `widget/ava-widget-integration.js`.
-2. Set `AVA_ENDPOINT` to your deployed base URL (and flip `USE_VERCEL = true` if you deployed on Vercel).
-3. Adapt the example element IDs to the real Ava widget markup on obsidianlabs.io, and include the snippet on the site.
-4. `sendToAva(text, onChunk)` streams the reply; `captureLead({...})` posts a captured lead.
-
-Nothing needs to change on the live site until you're ready — this repo is intentionally standalone.
+1. Open `widget/ava-widget-integration.js`, set `AVA_ENDPOINT` to your Worker URL.
+2. Add the snippet to the obsidianlabs site (see the repo's site-wiring instructions for the drop-in block that upgrades the existing Ava chat panel and corner widget to live AI chat).
+3. `sendToAva(text, onChunk)` streams the reply; `captureLead({...})` posts a captured lead.
 
 ---
 
 ## Swap in your booking link
 
-Ava references a scheduling link placeholder `[BOOKING LINK]`. When your calendar is ready:
-
-- Replace `[BOOKING LINK]` in **AVA_BRAIN.md** and in the `SYSTEM_PROMPT` of whichever backend you deployed, with your real [Cal.com](https://cal.com) or Calendly URL (e.g. `https://cal.com/obsidianlabs/intro`).
+Ava references a scheduling link placeholder `[BOOKING LINK]`. When your calendar is ready, replace `[BOOKING LINK]` in **AVA_BRAIN.md** with your real Cal.com or Calendly URL and redeploy.
 
 ---
 
 ## Voice option (the phone version of Ava)
 
-To stand up the **phone** receptionist, you don't need this backend at all — you reuse the same brain:
+The phone receptionist doesn't use this backend — you reuse the same brain:
 
 1. Create an agent in a voice platform such as **[Vapi](https://vapi.ai)** or **[Synthflow](https://synthflow.ai)**.
 2. Paste the contents of **AVA_BRAIN.md** as the agent's **system prompt**, and use the greeting from the *Voice Call Flow* section as the **first message**.
@@ -148,22 +122,24 @@ To stand up the **phone** receptionist, you don't need this backend at all — y
 
 ### Screened / whisper transfer (important)
 
-Robert wants to **know it's an Obsidian Labs call before he answers.** So the business-hours transfer is a **screened (whisper) transfer**, not a blind one: the platform calls Robert's cell, plays him a private whisper ("Obsidian Labs call from [caller] about [reason] — press 1 to accept, or hang up to send them to a message"), and only bridges the caller through **if Robert accepts**. If he declines / doesn't answer, Ava takes a detailed message instead (template in AVA_BRAIN.md → Voice Call Flow) and routes it to Robert via email/SMS. Configure it like this:
+Robert wants to **know it's an Obsidian Labs call before he answers.** The business-hours transfer is a **screened (whisper) transfer**, not a blind one: the platform calls Robert's cell, plays a private whisper ("Obsidian Labs call from [caller] about [reason] — press 1 to accept, or hang up to send them to a message"), and only bridges the caller through **if Robert accepts**. If he declines / doesn't answer, Ava takes a detailed message instead (template in AVA_BRAIN.md → Voice Call Flow).
 
-- **Vapi** — use a `transferCall` tool with `destination.type: "number"` set to `[TRANSFER_CELL]`, and a transfer plan that plays a whisper before connecting: set `transferPlan.mode` to `"warm-transfer-experimental"` (or the current warm/whisper mode), with a `summaryPlan` / whisper message announcing the caller. Enable "require acceptance" (DTMF press-1) so the call only bridges when Robert confirms; otherwise fall back to the message flow. See Vapi's *Call Transfers → Warm transfer with a summary* docs.
-- **Synthflow** — add a **Call Transfer** action set to **Warm Transfer** (not cold/blind), point it at `[TRANSFER_CELL]`, and enable the **agent whisper / transfer message** so the agent announces the caller to Robert and waits for him to accept before connecting. If the transfer isn't accepted, route back to the message-taking flow. See Synthflow's *Warm Transfer* action docs.
+- **Vapi** — `transferCall` tool with `destination.type: "number"` set to `[TRANSFER_CELL]`, warm-transfer plan with a whisper/summary and require-acceptance (DTMF press-1). Verify current field names in Vapi's *Call Transfers* docs when building.
+- **Synthflow** — **Call Transfer** action set to **Warm Transfer**, pointed at `[TRANSFER_CELL]`, with the agent whisper enabled. Verify against Synthflow's current docs when building.
 
-Set business-hours logic (9–5 ET, Mon–Fri) as a condition/variable on the transfer action so it only attempts the screened transfer during hours and takes a message otherwise.
+Gate the transfer to business hours (9–5 ET, Mon–Fri); otherwise Ava takes a message.
 
 ---
 
-## Security checklist
+## Security & privacy checklist
 
-- ✅ API key is an **env secret**, never in code and never sent to the browser.
+- ✅ **No API keys exist for chat.** Workers AI is authorized by the account binding itself.
 - ✅ CORS **fails closed** — only origins in `ALLOWED_ORIGINS` may call the backend.
 - ✅ System prompt lives server-side (can't be scraped from the page).
 - ✅ Inputs are trimmed and capped; conversation history is bounded.
-- ✅ `.gitignore` blocks `.env` / `.dev.vars` so secrets never get committed.
+- ✅ Replies are length-capped; model errors degrade to a polite fallback.
+- ✅ No real phone numbers in this repo — `[TRANSFER_CELL]` stays a placeholder forever.
+- ✅ `.gitignore` blocks `.env` / `.dev.vars` so nothing sensitive gets committed.
 
 ---
 
