@@ -44,7 +44,7 @@ const TEMPERATURE = 0.6;
 
 const FALLBACK_MESSAGE =
   "I'm having a little trouble connecting right now — sorry about that! " +
-  "Please try again in a moment, or email us at hello@obsidianlabs.io and " +
+  "Please try again in a moment, or email us at hello@obsidianlabshq.io and " +
   "Robert will get right back to you.";
 
 // Business hours: Monday–Friday, 9:00 AM – 5:00 PM Eastern Time.
@@ -203,7 +203,7 @@ async function handleLead(request, env, origin) {
 
   // Trim + cap everything. Never trust the client blindly.
   const payload = {
-    source: "obsidianlabs.io — Ava chat",
+    source: "obsidianlabshq.io — Ava chat",
     name: str(lead.name),
     business: str(lead.business),
     contact: str(lead.contact), // phone or email

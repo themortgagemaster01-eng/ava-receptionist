@@ -25,4 +25,4 @@ fallthrough = true
 [vars]
 # Comma-separated list of origins allowed to call this Worker.
 # GitHub Pages origin included so the current site works before the .io domain.
-ALLOWED_ORIGINS = "https://obsidianlabs.io,https://www.obsidianlabs.io,https://themortgagemaster01-eng.github.io"
+ALLOWED_ORIGINS = "https://obsidianlabshq.io,https://www.obsidianlabshq.io,https://themortgagemaster01-eng.github.io"
