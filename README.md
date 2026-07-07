@@ -88,7 +88,7 @@ widget/
 
 **Config notes**
 
-- `ALLOWED_ORIGINS` in `wrangler.toml` already includes `https://themortgagemaster01-eng.github.io` (the GitHub Pages origin) and the future `obsidianlabs.io` domains. Adjust as needed and redeploy.
+- `ALLOWED_ORIGINS` in `wrangler.toml` already includes `https://themortgagemaster01-eng.github.io` (the GitHub Pages origin) and the `obsidianlabshq.io` domains. Adjust as needed and redeploy.
 - Changed `AVA_BRAIN.md`? Just `npx wrangler deploy` again — the Worker imports it at build time.
 
 ---
